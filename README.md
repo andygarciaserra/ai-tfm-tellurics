@@ -112,18 +112,72 @@ Downloads and prepares PHOENIX stellar spectra.
 * number of resampled points
 
 **Outputs:**
+- download the PHOENIX wavelength grid,
+- download a selected stellar model,
+- cut the spectrum to a chosen wavelength range,
+- resample it to a lighter wavelength grid,
+- save FITS files and diagnostic plots.
+
+By default, this script keeps the original PHOENIX flux without continuum normalization. Normalized products are only generated when explicitly requested with `--normalize`.
+
+**Main inputs:**
+
+- stellar label, for example `A0V`, `G2V`, `M2V`,
+- effective temperature, `--teff`,
+- surface gravity, `--logg`,
+- metallicity, `--feh`,
+- wavelength range, `--wmin` and `--wmax`,
+- number of resampled points, `--n-resampled`.
+
+**Standard outputs:**
 
 ```text
 TFM_DATA/phoenix/downloads/
 TFM_DATA/phoenix/raw/
 TFM_DATA/phoenix/resampled/
+TFM_DATA/phoenix/metadata/
 TFM_DATA/plots/phoenix/
 ```
 
-**Example:**
+The standard FITS products contain:
+
+```text
+WAVE_MICRON
+FLUX
+```
+
+If `--normalize` is used, the FITS files also include:
+
+```text
+CONTINUUM
+FLUX_CONT_NORM
+```
+
+**Standard example:**
 
 ```bash
-python scripts/01_download_prepare_phoenix.py
+python scripts/01_download_prepare_phoenix.py \
+  --label A0V \
+  --teff 9600 \
+  --logg 4.0 \
+  --feh 0.0 \
+  --wmin 0.38 \
+  --wmax 0.79 \
+  --n-resampled 10000
+```
+
+**With normalization:**
+
+```bash
+python scripts/01_download_prepare_phoenix.py \
+  --label A0V \
+  --teff 9600 \
+  --logg 4.0 \
+  --feh 0.0 \
+  --wmin 0.38 \
+  --wmax 0.79 \
+  --n-resampled 10000 \
+  --normalize
 ```
 
 ---
