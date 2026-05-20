@@ -1,0 +1,23 @@
+# Python virtual environments
+.venv/
+venv/
+env/
+
+# Python cache
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Local data and generated outputs
+TFM_DATA/
+data/
+outputs/
+plots/
+*.fits
+*.fit
+*.fits.gz
+
+# OS/editor files
+.DS_Store
+.vscode/
+.idea/
