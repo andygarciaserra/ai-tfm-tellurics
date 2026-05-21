@@ -363,8 +363,6 @@ which esorex
 * [x] Molecfit installed and running.
 * [x] PHOENIX download tested.
 * [x] First PHOENIX spectrum downloaded and resampled.
-* [x] Initial Molecfit output plots created.
-* [x] Scripts reorganized into final structure.
 * [x] Initial PHOENIX stellar pool generated and validated.
 * [x] PHOENIX pool configuration file added.
 * [x] PHOENIX pool validation script added.
