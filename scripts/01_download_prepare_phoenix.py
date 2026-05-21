@@ -232,6 +232,9 @@ def save_spectrum_fits(
     continuum: np.ndarray | None = None,
     flux_norm: np.ndarray | None = None,
 ) -> None:
+    if path.exists() and not overwrite:
+        print(f"FITS already exists: {path}")
+        return
     columns = [
         fits.Column(name="WAVE_MICRON", array=wave_micron.astype("float32"), format="E"),
         fits.Column(name="FLUX", array=flux.astype("float32"), format="E"),
@@ -288,7 +291,7 @@ def plot_spectrum(
         return
 
     plt.figure(figsize=(14, 5))
-    plt.plot(wave, flux, linewidth=0.35)
+    plt.plot(wave, flux, 'k', linewidth=0.35)
     plt.xlabel("Wavelength [micron]")
     plt.ylabel(ylabel)
     plt.title(title)
