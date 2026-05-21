@@ -54,9 +54,12 @@ ai-tfm-tellurics/
 
   scripts/
     01_download_prepare_phoenix.py
-    02_run_molecfit_single.sh
-    03_plot_molecfit_outputs.py
-    04_build_synthetic_dataset.py
+    02_generate_phoenix_pool.sh
+    03_validate_phoenix_pool.py
+    04_generate_mtrans_single.sh
+    05_generate_mtrans_grid.sh *
+    06_validate_mtrans_grid.py *
+    07_build_synthetic_dataset.py *
 
     utils/
       inspect_fits.py
@@ -66,11 +69,13 @@ ai-tfm-tellurics/
       demo_blackbody_tellurics.py
 
     _archive_initial/
-      old exploratory scripts
+      (old exploratory scripts)
 
   configs/
-    molecfit.rc
-    example.sof
+    phoenix_initial_pool.csv
+
+
+* To be done
 ```
 
 Large generated files should be stored outside the repository, for example:
@@ -182,112 +187,112 @@ python scripts/01_download_prepare_phoenix.py \
 
 ---
 
-### `scripts/02_run_molecfit_single.sh`
+### `scripts/02_generate_phoenix_pool.sh`
 
-Runs one Molecfit execution using `esorex`.
+Generates the initial PHOENIX stellar pool from a CSV configuration file.
+
+This script is a Bash wrapper around `scripts/01_download_prepare_phoenix.py`. It reads one row per stellar model from:
+
+```text
+configs/phoenix_initial_pool.csv
+```
+
+and runs the PHOENIX preparation script with the corresponding parameters.
 
 **Main tasks:**
 
-* run `molecfit_model`,
-* use a Molecfit recipe config,
-* use a `.sof` input file,
-* write Molecfit outputs.
+* read the PHOENIX pool configuration,
+* generate several PHOENIX spectra in batch,
+* keep the pool definition version-controlled and reproducible,
+* print progress as `[i/N]` for each model.
 
 **Main inputs:**
 
-```text
-configs/molecfit.rc
-configs/example.sof
-```
+* `configs/phoenix_initial_pool.csv`
 
-**Outputs:**
+The current initial pool contains:
 
 ```text
-TFM_DATA/molecfit/outputs/
-```
-
-or, during early testing:
-
-```text
-outputs/
+F5V
+G2V
+K5V
+M0V
+M2V
 ```
 
 **Example:**
 
 ```bash
-bash scripts/02_run_molecfit_single.sh
+bash scripts/02_generate_phoenix_pool.sh
+```
+
+A different config file can also be passed explicitly:
+
+```bash
+bash scripts/02_generate_phoenix_pool.sh configs/phoenix_initial_pool.csv
 ```
 
 ---
 
-### `scripts/03_plot_molecfit_outputs.py`
+### `scripts/03_validate_phoenix_pool.py`
 
-Plots Molecfit output products.
+Validates the generated PHOENIX stellar pool.
 
-**Main tasks:**
+The script reads the same CSV configuration used to generate the pool and checks that the expected FITS and metadata products were created correctly.
 
-* read `BEST_FIT_MODEL.fits`,
-* plot observed flux,
-* plot fitted model,
-* plot telluric transmission,
-* plot approximate telluric correction.
+**Main checks:**
 
-**Expected FITS columns:**
+* expected FITS files exist,
+* expected metadata JSON files exist,
+* FITS files contain `WAVE_MICRON` and `FLUX`,
+* wavelength and flux arrays have the expected length,
+* wavelength grid is finite and strictly increasing,
+* wavelength range matches the requested range,
+* flux values are finite and not identically zero,
+* available metadata values are consistent with the CSV configuration.
 
-* `lambda`
-* `flux`
-* `mflux`
-* `mtrans`
+**Main inputs:**
+
+* `configs/phoenix_initial_pool.csv`
+* generated PHOENIX products in `TFM_DATA/phoenix/`
 
 **Outputs:**
 
 ```text
-TFM_DATA/plots/molecfit/
-```
-
-or, during early testing:
-
-```text
-outputs/
+TFM_DATA/phoenix/metadata/phoenix_initial_pool_validation_summary.csv
 ```
 
 **Example:**
 
 ```bash
-python scripts/03_plot_molecfit_outputs.py
+python scripts/03_validate_phoenix_pool.py
+```
+
+A different config file can also be passed explicitly:
+
+```bash
+python scripts/03_validate_phoenix_pool.py configs/phoenix_initial_pool.csv
 ```
 
 ---
 
-### `scripts/04_build_synthetic_dataset.py`
+### `scripts/04_generate_mtrans_single.sh`
 
-Builds the first synthetic dataset by combining PHOENIX spectra with Molecfit transmission models.
+Initial script for generating one Molecfit/mtrans atmospheric transmission model.
 
-**Main operation:**
+This script is the starting point for the atmospheric part of the pipeline. The goal is to first generate one local `mtrans` product in a controlled and reproducible way before scaling to a grid of atmospheric models.
 
-```text
-observed_flux = clean_flux × transmission
-```
+**Planned role:**
 
-**Main inputs:**
-
-* prepared PHOENIX spectra,
-* Molecfit `mtrans` files,
-* stellar metadata,
-* atmospheric metadata.
-
-**Outputs:**
-
-```text
-TFM_DATA/synthetic/spectra/
-TFM_DATA/synthetic/metadata/
-TFM_DATA/plots/synthetic/
-```
+* generate one atmospheric transmission model,
+* store the output in `TFM_DATA/molecfit/`,
+* keep logs and metadata for the run,
+* serve as the basic unit for future grid generation and parallelization.
 
 **Example:**
 
 ```bash
-python scripts/04_build_synthetic_dataset.py
+bash scripts/04_generate_mtrans_single.sh
 ```
 
 ---
@@ -359,21 +364,22 @@ which esorex
 * [x] PHOENIX download tested.
 * [x] First PHOENIX spectrum downloaded and resampled.
 * [x] Initial Molecfit output plots created.
-* [ ] Scripts reorganized into final structure.
-* [ ] PHOENIX stellar pool generated.
-* [ ] Molecfit atmospheric grid automated.
-* [ ] First synthetic dataset generated.
+* [x] Scripts reorganized into final structure.
+* [x] Initial PHOENIX stellar pool generated and validated.
+* [x] PHOENIX pool configuration file added.
+* [x] PHOENIX pool validation script added.
+* [ ] Molecfit/mtrans atmospheric grid automated.
 
 ---
 
 ## Roadmap
 
-1. Clean and rename current scripts.
-2. Generate a small PHOENIX stellar pool.
-3. Automate Molecfit transmission generation.
-4. Build the first synthetic dataset.
-5. Add instrumental resolution.
-6. Add synthetic noise.
+1. Automate Molecfit/mtrans single-run generation.
+2. Generate a small local mtrans test grid.
+3. Test the same workflow on Dicha/IAC.
+4. Add parallel mtrans generation.
+5. Build the first synthetic dataset.
+6. Add instrumental resolution and noise.
 
 
 ## Notes
