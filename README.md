@@ -52,7 +52,6 @@ The final goal is to use these datasets to train machine learning models for tel
 ## Repository structure
 
 ```text
-## Repository structure
 
 ai-tfm-tellurics/
 ├── README.md
@@ -296,7 +295,6 @@ python scripts/03_validate_phoenix_pool.py configs/phoenix_initial_pool.csv
 
 ---
 
-````markdown
 ### `scripts/04_generate_mtrans_single.sh`
 
 Generates one Molecfit/calctrans atmospheric transmission run from a CSV configuration file.
@@ -311,7 +309,7 @@ The script reads one row from a Molecfit configuration CSV, selected by `run_id`
 configs/molecfit/mtrans_single_config.csv
 configs/molecfit/mtrans_grid.csv
 configs/molecfit/mtrans_config_test.csv
-````
+```
 
 Each row contains the atmospheric and observational parameters used for a run, for example:
 
@@ -403,7 +401,6 @@ qual
 
 ---
 
-````markdown
 ### `scripts/05_preview_telluric_injection.py`
 
 Creates diagnostic plots for one Molecfit/calctrans run.
@@ -424,7 +421,7 @@ This script is used to visually validate that a generated atmospheric transmissi
 
 ```text
 synthetic_flux(lambda) = flux(lambda) × mtrans_interpolated(lambda)
-````
+```
 
 * generate diagnostic plots:
 
@@ -471,9 +468,6 @@ TFM_DATA/molecfit/runs/<run_id>/preview/
   <run_id>_mtrans.png
   <run_id>_phoenix_vs_telluric.png
   <run_id>_phoenix_vs_telluric_zoom.png
-```
-
-```
 ```
 
 
