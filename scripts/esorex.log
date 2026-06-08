@@ -1,0 +1,8 @@
+
+Start time     : 2026-06-07T18:01:57
+Program name   : esorex
+Severity level : [ INFO  ] 
+
+18:01:57 [ INFO  ] : [tid=000] This is EsoRex, version 3.13.10
+18:01:57 [ INFO  ] : [tid=000] using the libraries: CPL = 7.3.2, CFITSIO = 4.6.3, WCSLIB = 8.4, FFTW (normal precision) = 3.3.10-sse2-avx-avx2, FFTW (single precision) = 3.3.10-sse2-avx-avx2, OPENMP = 201511
+18:01:57 [ INFO  ] : [tid=000] Invocation command line was: esorex --man-page molecfit_calctrans

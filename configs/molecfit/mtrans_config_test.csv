@@ -1,0 +1,2 @@
+run_id,template_spectrum,pwv,telalt,rhum,pres,temp,molecules,fit_molec,rel_col,wave_include,wavelength_frame,latitude,longitude,geoelev,slit_width,pix_scale
+atm_test002,/home/andy/TFM_DATA/phoenix/resampled/phoenix_G2V_T5800_logg4p5_fehp0p0_10000pts.fits,3.0,60.0,15.0,750.0,15.0,"H2O,O2,O3,CO2","0,0,0,0","1.0,1.0,1.0,1.0","0.68,0.72,0.75,0.81",VAC,-24.6276,-70.4051,2635.0,0.4,0.086

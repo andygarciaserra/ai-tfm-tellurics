@@ -1,0 +1,461 @@
+
+     ***** ESO Recipe Execution Tool, version 3.13.10  *****
+
+
+NAME
+  molecfit_model -- Extract 1D spectrum's from a multi-extension input raw
+                    FITS files and compute an atmospheric model for each.
+
+SYNOPSIS
+  esorex [esorex-options] molecfit_model [molecfit_model-options] sof
+
+DESCRIPTION
+  This recipe runs Molecfit on a 1D spectrum (direct or extracted form the input).
+  The input data STD_MODEL/SCIENCE_CALCTRANS/SCIENCE could be:
+    - BINTABLE  - Table  (single or multi-extension, optionally with some NULL extensions)
+    - IMAGE(1D) - Vector (single or multi-extension, optionally with some NULL extensions)
+    - IMAGE(2D) - Image  (single or multi-extension, optionally with some NULL extensions)
+  It is not mandatory that all the extensions contain data.
+  Molecfit will be run  on all the extensions that contain data.
+  The recipe also accepts as input a kernel library.
+  If no kernel is provided, this is considered as a free parameter and it will be determined by Molecfit itself.
+  
+  Input files:
+    - Mandatory,  the input STD_MODEL/SCIENCE_CALCTRANS/SCIENCE data (Only one).
+    - Mandatory,  the fit molecules.
+    - Optionally, the inc/exc ranges/pixel.
+    - Optionally, the user kernel library.
+    - If the user kernel library is used, the parameter MODEL_MAPPING_KERNEL or MAPPING_KERNEL is a list of the extensions to map from the kernel library file MODEL_KERNEL_LIBRARY or KERNEL_LIBRARY to the extensions of the STD_MODEL or SCIENCE input file.
+    - Optionally, the GDAS profile.
+    - Optionally, the atmospheric standard profile.
+  
+  DO: Category                                  Required    Explanation
+  -------------                                 --------    -----------
+    STD_MODEL or SCIENCE_CALCTRANS or SCIENCE     Y         The input spectrum           (Multi-extension FITS           format).
+    MOLECULES                                     Y      The molecules          table (         3-cols FITS BINTABLE  format) or the recipe parameters --LIST_MOLEC, --FIT_MOLEC, --REL_COL.
+    WAVE_INCLUDE                                  N      The wavelength include table (         2-cols FITS BINTABLE  format) or the recipe parameter  --WAVE_INCLUDE.
+    WAVE_EXCLUDE                                  N      The wavelength exclude table (         2-cols FITS BINTABLE  format) or the recipe parameter  --WAVE_EXCLUDE.
+    PIXEL_EXCLUDE                                 N      The pixel      exclude table (         2-cols FITS BINTABLE  format) or the recipe parameter  --PIXEL_EXCLUDE.
+    MODEL_KERNEL_LIBRARY or KERNEL_LIBRARY        N         The kernel library           (Multi-extension FITS IMAGE(2D) format).
+    MODEL_MAPPING_KERNEL or MAPPING_KERNEL        N      Kernel mapping table         (         1-col  FITS BINTABLE  format) or the recipe parameter  --MODEL_MAPPING_KERNEL.
+    GDAS                                          N         User define GDAS profile     (                FITS BINTABLE  format).
+    ATM_PROFILE_STANDARD                          N         User define GDAS profile     (                FITS BINTABLE  format).
+  
+  Notes:
+    - MOLECULES                            BINTABLE columns [LIST_MOLEC, FIT_MOLEC, REL_COL]
+    - WAVE_INCLUDE                         BINTABLE columns [LOWER_LIMIT, UPPER_LIMIT]
+    - WAVE_EXCLUDE                         BINTABLE columns [LOWER_LIMIT, UPPER_LIMIT]
+    - PIXEL_EXCLUDE                        BINTABLE columns [LOWER_LIMIT, UPPER_LIMIT]
+    - MODEL_MAPPING_KERNEL or MAPPING_KERNEL  BINTABLE column  [KERNEL_LIBRARY_EXT]
+  
+  
+  Output files:
+  
+  DO: Category                      Explanation
+  -------------                     -----------
+    MODEL_CHIPS_COMBINED            Input file chips combined in molecfit format    (                FITS BINTABLE format).
+    GDAS                            Used GDAS profile                               (                FITS BINTABLE format).
+    GDAS_BEFORE                     If ESO DB GDAS is used, file before the MJD-OBS (                FITS BINTABLE format).
+    GDAS_AFTER                      If ESO DB GDAS is used, file after  the MJD-OBS (                FITS BINTABLE format).
+    MODEL_MOLECULES                 The molecules          table                    (         3-cols FITS BINTABLE format).
+    WAVE_INCLUDE                    The wavelength include table                    (         2-cols FITS BINTABLE format).
+    WAVE_EXCLUDE                    The wavelength exclude table                    (         2-cols FITS BINTABLE format).
+    PIXEL_EXCLUDE                   The pixel      exclude table                    (         2-cols FITS BINTABLE format).
+    ATM_PROFILE_STANDARD            Atmospheric profile standard - Initial          (                FITS BINTABLE format).
+    ATM_PROFILE_COMBINED            Atmospheric profile combined with GDAS.         (                FITS BINTABLE format).
+    ATM_PARAMETERS                  Atmospheric parameters                          (Multi-extension FITS BINTABLE format).
+    BEST_FIT_PARAMETERS             Best fitting parameters                         (Multi-extension FITS BINTABLE format).
+    BEST_FIT_MODEL                  Best fit model and intermediate products        (Multi-extension FITS BINTABLE format).
+    MODEL_KERNEL_LIBRARY            The kernel library processed in mf_model(...) Molecfit function: Normalize and Resample.
+  
+  
+
+OPTIONS
+  The following options are provided by this recipe.
+
+  --USE_ONLY_INPUT_PRIMARY_DATA  : Value=TRUE implies that only the fits primary
+                                   contains the input science flux data.
+                                   Value=FALSE implies that the fits extensions
+                                   also contains input science flux data.
+                                   [FALSE]
+  --USE_DATA_EXTENSION_AS_DFLUX  : Only valid if
+                                   USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                   extension index that contains the
+                                   errors of the science flux data (DFLUX). A
+                                   value of 0 implies that there is no DFLUX.
+                                   [0]
+  --USE_DATA_EXTENSION_AS_MASK  : Only valid if
+                                  USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                  extension index that contains the
+                                  mask associated with the science flux data. A
+                                  value of 0 implies that there is no mask
+                                  data. [0]
+  --USE_INPUT_KERNEL    : If TRUE, use the kernel library if it is provided.
+                          [TRUE]
+  --MODEL_MAPPING_KERNEL: Mapping 'STD_MODEL/SCIENCE' - 'MODEL_KERNEL_LIBRARY'
+                          [string with ext_number comma separated (int)] :
+                          If set to NULL, check if the
+                          TAG[MODEL_MAPPING_KERNEL] FITS BINTABLE values is
+                          provided.
+                          The FITS BINTABLE have to one column
+                          [KERNEL_LIBRARY_EXT]. [NULL]
+  --LIST_MOLEC          : List of molecules to be included in the model.
+                          Represented as a comma separated
+                          string of molecule names, e.g. "H2O,CO2,O3".
+                          If set to NULL, the input TAG[MOLECULES] FITS
+                          BINTABLE values have to be provided
+                          where the FITS BINTABLE specified contains the three
+                          columns:
+                          LIST_MOLEC; FIT_MOLEC; and REL_COL. [NULL]
+  --FIT_MOLEC           : List of flags that specify which of the listed
+                          molecules are to be fitted for.
+                          Flag=1 implies yes. Flag=0 implies no. Represented as
+                          a string of comma separated
+                          integers in the same order as the listed molecules.
+                          For example: if LIST_MOLEC="H2O,CO2,O3", then 
+                          FIT_MOLEC="1,0,1" implies that only H2O and O3 should
+                          be fitted for.
+                          If set to NULL, the input TAG[MOLECULES] FITS
+                          BINTABLE values have to be provided where the FITS 
+                          BINTABLE specified contains the three columns:
+                          LIST_MOLEC; FIT_MOLEC; and REL_COL. [NULL]
+  --REL_COL             : List of the intial values of fitting of the molecular
+                          columns expressed relatively to the input
+                           ATM profile columns. Represented as a comma
+                          separated list of doubles in the same order as the 
+                          listed molecules. For example, if
+                          LIST_MOLEC="H2O,CO2,O3", then REL_COL="1.0,1.2,0.8"
+                          implies that H2O, CO2 and O3 have initial relative
+                          values of 1.0, 1.2 and 0.8 respectively.
+                          If set to NULL, the input TAG[MOLECULES] FITS
+                          BINTABLE values have to be provided where the FITS 
+                          BINTABLE specified contains the three columns:
+                          LIST_MOLEC; FIT_MOLEC; and REL_COL. [NULL]
+  --WAVE_INCLUDE        : Wavelength ranges to be included. Represented as a
+                          string of comma separated doubles in pairs 
+                          specifying the start and end wavelengths of a range.
+                          The wavelength units are always in microns.
+                          For example a KMOS sample data in the range of 1.11um
+                          to 1.67um may have
+                          WAVE_INCLUDE="1.773,1.78633,1.79098,1.80434,1.187691,1.189937"
+                          to represent three inclusion regions:
+                          [1.773,1.78633], [1.79098,1.80434] and
+                          [1.187691,1.189937].
+                          If set to NULL, molecfit will check if the
+                          TAG[WAVE_INCLUDE] FITS BINTABLE values is provided
+                          where
+                          the FITS BINTABLE specified has the two columns:
+                          LOWER_LIMIT; and UPPER_LIMIT. [NULL]
+  --WAVE_EXCLUDE        : Wavelength ranges to be excluded. Represented as a
+                          string of comma separated doubles in pairs 
+                          specifying the start and end wavelengths of a range.
+                          The wavelength units are always in microns.
+                          as the input science data. For example a KMOS sample
+                          data in the range of 1.11um to 1.67um may have
+                          WAVE_EXCLUDE="1.773,1.78633,1.79098,1.80434,1.187691,1.189937"
+                          to represent three exclusion regions:
+                          [1.773,1.78633], [1.79098,1.80434] and
+                          [1.187691,1.189937].
+                          If set to NULL, molecfit will check if the
+                          TAG[WAVE_EXCLUDE] FITS BINTABLE values is provided
+                          where
+                          the FITS BINTABLE specified has the two columns:
+                          LOWER_LIMIT; and UPPER_LIMIT. [NULL]
+  --PIXEL_EXCLUDE       : Pixel ranges to be excluded. Represented as a string
+                          of comma separated integers in pairs specifying the
+                          start and end pixel of a range. For example:
+                          PIXEL_EXCLUDE="54,128,512,514,1020,1024" represents
+                          three
+                          exclusion regions: [54,128], [512,514] and
+                          [1020,1024].
+                          If set to NULL, molecfit will check if the
+                          TAG[PIXEL_EXCLUDE] FITS BINTABLE values is provided
+                          where the
+                          FITS BINTABLE specified has the two columns:
+                          LOWER_LIMIT; and UPPER_LIMIT. [NULL]
+  --TELLURICCORR_PATH   : Installation directory.
+                          [TELLURICCORR_PARAMETER_DEFAULT]
+  --TELLURICCORR_DATA_PATH  : Data directory. [TELLURICCORR_PARAMETER_DEFAULT]
+  --TMP_PATH            : Temporary directory. [TELLURICCORR_PARAMETER_DEFAULT]
+  --SILENT_EXTERNAL_BINS: Silent the output of the external binaries. [TRUE]
+  --TRANSMISSION        : Type of input spectrum : 0 = Emission(radiance); 1 =
+                          Transmission. [TRUE]
+  --COLUMN_LAMBDA       : Wavelength column ('NULL' can be used if the file is
+                          an image and that
+                          the data are in the primary
+                          (data are given by the FITS header keywords
+                          [CRVAL1=wave_ini, CD1_1=step])
+                          If CD1_1 is absent, then the DEPRECATED CDELT1
+                          keyword will be used. [lambda]
+  --COLUMN_FLUX         : Flux column. [flux]
+  --COLUMN_DFLUX        : Flux error column (Avoided by writing 'NULL') :
+                          1-sigma error on the flux. [NULL]
+  --COLUMN_MASK         : Mask column (Avoided by writing 'NULL') : Indicates if
+                          a pixel is invalid. [NULL]
+  --DEFAULT_ERROR       : Default error relative to mean for the case that the
+                          error column
+                          is not provided. [0.01]
+  --WLG_TO_MICRON       : Multiplicative factor applied to the wavelength to
+                          express is in micron.
+                          E.g.: if wavelength is given in nm, the value should
+                          be 0.001. [1.0]
+  --WAVELENGTH_FRAME    : Wavelength in vacuum                                  
+                             = 'VAC'.
+                          Wavelength in air    with the observatory reference
+                          frame = 'AIR'.
+                          Wavelength in air    with another         reference
+                          frame = 'AIR_RV'.
+                          Wavelength in vacuum with another         reference
+                          frame = 'VAC_RV'.
+                            (typically the  sun or the barycenter of the solar
+                          system).
+                          In the latter case, the radial velocity of the
+                          observatory relative
+                            to the external reference frame must be provided in
+                          the parameter obs_RV. [VAC]
+  --OBS_ERF_RV_KEY      : The radial velocity of the observatory in km/s
+                          relative to the external reference frame;
+                          It is positive if the distance between the science
+                          target and the Earth
+                          increases along the line-of-sight to the science
+                          target.
+                          It must be provided if MF_PARAMETERS_WAVELENGTH_FRAME
+                          = 'VAC_RV'. [NONE]
+  --OBS_ERF_RV_VALUE    : If OBS_ERF_RV_KEYWORD=='NONE' take this value. [0.0]
+  --CLEAN_MODEL_FLUX    : Set model flux to 0 for non-fitted pixels. [FALSE]
+  --FTOL                : Relative chi-square convergence criterion. [1e-10]
+  --XTOL                : Relative parameter convergence criterion. [1e-10]
+  --FLUX_UNIT           : Conversion of fluxes from phot/(s*m2*mum*as2)
+                          (emission spectrum only)
+                             to flux unit of observed spectrum:
+                          0: phot / (s *  m^2 * mum * as^2) [no conversion]
+                          1:    W / (     m^2 * mum * as^2)
+                          2:  erg / (s * cm^2 *   A * as^2)
+                          3:  mJy / (                 as^2)
+                          For other units, the conversion factor has to be
+                          considered
+                           as constant term of the continuum fit. [0]
+  --FIT_TELESCOPE_BACKGROUND  : Fit of telescope background -- 1 = yes; 0 = no
+                                (emission spectrum only). [TRUE]
+  --TELESCOPE_BACKGROUND_CONST  : Initial value for telescope background fit.
+                                  [0.1]
+  --FIT_CONTINUUM       : Comma deliminated string of flags (1=true, 0=false)
+                          for fitting continuum in specific regions.
+                          If set to NULL, check if the TAG[WAVE_INCLUDE] points
+                          to a FITS BINTABLE with column CONT_FIT_FLAG
+                          provided. [1]
+  --CONTINUUM_N         : Polynomial order for continuum model for each region.
+                          Presented as a comma deliminated string.
+                          If set to NULL, check if the TAG[WAVE_INCLUDE] points
+                          to a FITS BINTABLE with column CONT_POLY_ORDER
+                          provided. [0]
+  --CONTINUUM_CONST     : Initial constant term for continuum fit (valid for all
+                          fit ranges)
+                          [emission spectrum: about 1 for correct flux_unit].
+                          [1.0]
+  --MAP_REGIONS_TO_CHIP : Comma deliminated string of chip indices that each
+                          range is associated with.
+                          If set to NULL, check if the TAG[WAVE_INCLUDE] points
+                          to a FITS BINTABLE with column MAPPED_TO_CHIP
+                          provided. [1]
+  --FIT_WLC             : Flags for including regions in wavelength corrections.
+                          If set to NULL, check if the TAG[WAVE_INCLUDE] points
+                          to
+                          a FITS BINTABLE with column WLC_FIT_FLAG provided.
+                          [0]
+  --WLC_N               : Polynomial degree of the refined wavelength solution.
+                          [1]
+  --WLC_CONST           : Initial constant term for wavelength adjustment
+                          (shift relative to half wavelength range). [-0.05]
+  --FIT_RES_BOX         : Fit the width of a Boxcar LSF. [TRUE]
+  --RES_BOX             : Initial value for FWHM of Boxcar rel. to slit width
+                          at the centre of the spectrum. [1.0]
+  --FIT_RES_GAUSS       : Fit the FWHM of a Gaussian LSF. [TRUE]
+  --RES_GAUSS           : Initial value for FWHM of the Gaussian in pixels
+                          at the centre of the spectrum. [1.0]
+  --FIT_RES_LORENTZ     : Fit the FWHM of a Lorentzian LSF. [TRUE]
+  --RES_LORENTZ         : Initial value for FWHM of the Lorentz in pixels
+                          at the centre of the spectrum. [1.0]
+  --KERNMODE            : Voigtian profile approximation instead of independent
+                          Gaussian and Lorentzian?. [FALSE]
+  --KERNFAC             : Size of Voigtian/Gaussian/Lorentzian kernel in FWHM.
+                          [3.0]
+  --VARKERN             : Does the kernel size increase linearly with
+                          wavelength?. [FALSE]
+  --OBSERVING_DATE_KEYWORD  : Observing date in years or MJD in days (not
+                              string). [MJD-OBS]
+  --OBSERVING_DATE_VALUE: If OBSERVING_DATE_KEYWORD=='NONE' take this value.
+                          [-1.0]
+  --UTC_KEYWORD         : UTC in s. [UTC]
+  --UTC_VALUE           : If UTC_KEYWORD=='NONE' take this value. [-1.0]
+  --TELESCOPE_ANGLE_KEYWORD  : Telescope altitude angle in deg. [ESO TEL ALT]
+  --TELESCOPE_ANGLE_VALUE  : If TELESCOPE_ANGLE_KEYWORD=='NONE' take this value.
+                             [90.0]
+  --RELATIVE_HUMIDITY_KEYWORD  : Relative humidity in %. [ESO TEL AMBI RHUM]
+  --RELATIVE_HUMIDITY_VALUE  : If RELATIVE_HUMIDITY_KEYWORD=='NONE' take this
+                               value. [15.0]
+  --PRESSURE_KEYWORD    : Pressure in hPa. [ESO TEL AMBI PRES START]
+  --PRESSURE_VALUE      : If PRESSURE_KEYWORD=='NONE' take this value. [750.0]
+  --TEMPERATURE_KEYWORD : Ambient temperature in deg C. [ESO TEL AMBI TEMP]
+  --TEMPERATURE_VALUE   : If TEMPERATURE_KEYWORD=='NONE' take this value. [15.0]
+  --MIRROR_TEMPERATURE_KEYWORD  : Mirror temperature in deg C. [ESO TEL TH M1
+                                  TEMP]
+  --MIRROR_TEMPERATURE_VALUE  : If MIRROR_TEMPERATURE_KEYWORD=='NONE' take this
+                                value. [15.0]
+  --ELEVATION_KEYWORD   : Elevation above sea level in m (default is Paranal:
+                          2635. m). [ESO TEL GEOELEV]
+  --ELEVATION_VALUE     : If ELEVATION_KEYWORD=='NONE' take this value. [2635.0]
+  --LONGITUDE_KEYWORD   : Longitude (default is Paranal: -70.4051 deg). [ESO TEL
+                          GEOLON]
+  --LONGITUDE_VALUE     : If LONGITUDE_KEYWORD=='NONE' take this value.
+                          [-70.4051]
+  --LATITUDE_KEYWORD    : Latitude (default is Paranal: -24.6276 deg). [ESO TEL
+                          GEOLAT]
+  --LATITUDE_VALUE      : If LATITUDE_KEYWORD=='NONE' take this value.
+                          [-24.6276]
+  --SLIT_WIDTH_KEYWORD  : Slit width in arcsec (taken from FITS header if
+                          present). [ESO INS SLIT1 WID]
+  --SLIT_WIDTH_VALUE    : If SLIT_WIDTH_KEYWORD=='NONE' take this value. [0.4]
+  --PIX_SCALE_KEYWORD   : Pixel scale in arcsec (taken from this file only).
+                          [NONE]
+  --PIX_SCALE_VALUE     : If PIX_SCALE_KEYWORD=='NONE' take this value. [0.086]
+  --REFERENCE_ATMOSPHERIC  : Reference atmospheric profile. Possible values:
+                             - equ.fits (default; equatorial atmosphere, valid
+                             for Paranal);
+                             - tro.fits (tropical atmosphere);
+                             - std.fits (standard atmosphere);
+                             - Other file located in :
+                               ({TELLURICCORR_DATA_PATH}/profiles/mipas/).
+                             [equ.fits]
+  --GDAS_PROFILE        : Specify which GDAS profile to use. Possible values: 
+                          - 'auto',  automatic retrieval of the GDAS profiles
+                          (P[hPa] HGT[km] T[K] RELHUM[%]) close in time to the
+                          observation and in location to the observatory. If 
+                          the files are not on disk and there is no internet 
+                          connection, the average profile is taken from      
+                          share/molecfit/data/profiles/lib corresponding to  
+                          the month of the observation (GDAS_t0_s1.fits for  
+                          Dec/Jan, GDAS_t0_s2.fits for Feb/Mar, etc)         
+                          See Sec. 8.1.4 of the molecfit manual for more info.
+                          - 'null', use the profile in the SOF with tag GDAS. 
+                          If there is no profile in the SOF, the behaviour    
+                          is the same as GDAS_PROF=auto.                      
+                          - 'none', use the average profile taken from       
+                          share/molecfit/data/profiles/lib corresponding to  
+                          the month of observation (see 'auto' description). 
+                          - 'directory/file.fits', use the specified path and
+                          filename as the GDAS profile. Either an absolute path
+                          (starting with '/') or a relative path may be used,
+                          however a relative path is preferred, since only  
+                          the first 40 char of the path and filename are    
+                          copied to the FITS header. The file format must be
+                          a FITS binary table with columns having the names: 
+                          'press height temp relhum' and units:              
+                          hPa, km, K and %, respectively. [auto]
+  --LAYERS              : Grid of layer heights for merging ref_atm and GDAS
+                          profile.
+                          Fixed grid = CPL_TRUE and natural grid = CPL_FALSE.
+                          [TRUE]
+  --EMIX                : Upper mixing height in km for considering data of a
+                          local meteo station.
+                          If emix is below geoelev, rhum, pres, and temp are
+                          not used
+                          for modifying the corresponding profiles. [5.0]
+  --PWV                 : PWV value in mm for the input water vapor profile.
+                          The merged profile composed of ref_atm, GDAS, and
+                          local meteo data
+                          will be scaled to this value if pwv > 0 (default: -1
+                          -> no scaling). [-1.0]
+  --LNFL_LINE_DB        : File name of the line list (must be stored in the
+                          directory :
+                          ({TELLURICCORR_DATA_PATH}/hitran/). [aer_v_3.8.1.2]
+  --LNFL_LINE_DB_FORMAT : Format of the line file: gives the length in terms of
+                          characters per line. [100.0]
+  --LBLRTM_ICNTNM       : Continua and Rayleigh extinction [0,1,2,3,4,5]. [5]
+  --LBLRTM_IAERSL       : Aerosols [0,1]. [0]
+  --LBLRTM_MPTS         : Number of optical depth values. [5]
+  --LBLRTM_NPTS         : Number of values for each panel. [5]
+  --LBLRTM_V1           : Beginning wavenumber value for the calculation. [1.9]
+  --LBLRTM_V2           : Ending wavenumber value for the calculation. [2.4]
+  --LBLRTM_SAMPLE       : Number of sample points per mean halfwidth [between 1
+                          to 4, default=4]. [4]
+  --LBLRTM_ALFAL0       : Average collision broadened halfwidth [cm-1/atm].
+                          [0.0]
+  --LBLRTM_AVMASS       : Average molecular mass [amu] for Doppler halfwidth.
+                          [0.0]
+  --LBLRTM_DPTMIN       : Minimum molecular optical depth below which lines will
+                          be rejected. [0.0002]
+  --LBLRTM_DPTFAC       : Factor multiplying molecular continuum optical depth.
+                          [0.001]
+  --LBLRTM_TBOUND       : Temperature of boundary [K]. [0.0]
+  --LBLRTM_SREMIS1      : Emissivity coefficient 1. [0.0]
+  --LBLRTM_SREMIS2      : Emissivity coefficient 2. [0.0]
+  --LBLRTM_SREMIS3      : Emissivity coefficient 3. [0.0]
+  --LBLRTM_SRREFL1      : Reflectivity coefficient 1. [0.0]
+  --LBLRTM_SRREFL2      : Reflectivity coefficient 2. [0.0]
+  --LBLRTM_SRREFL3      : Reflectivity coefficient 3. [0.0]
+  --LBLRTM_MODEL        : Atmospheric profile [0,1,2,3,4,5,6]. [0]
+  --LBLRTM_ITYPE        : Type of path [1,2,3]. [3]
+  --LBLRTM_NOZERO       : Zeroing of small amounts of absorbers [0,1]. [0]
+  --LBLRTM_NOPRNT       : Do not print output? [0,1]. [0]
+  --LBLRTM_IPUNCH       : Write out layer data to TAPE7 [0,1]. [0]
+  --LBLRTM_RE           : Radius of earth [km]. [0.0]
+  --LBLRTM_HSPACE       : Altitude definition for space [km]. [120.0]
+  --LBLRTM_H2           : Upper height limit [km]. [0.0]
+  --LBLRTM_RANGE        : Length of a straight path from H1 to H2 [km]. [0.0]
+  --LBLRTM_BETA         : Earth centered angle from H1 to H2 [degrees]. [0.0]
+  --LBLRTM_LEN          : Path length [0,1]. [0]
+  --LBLRTM_HOBS         : Height of observer. [0.0]
+  --LBLRTM_AVTRAT       : Maximum Voigt width ratio across a layer. [2.0]
+  --LBLRTM_TDIFF1       : Maximum layer temperature difference at ALTD1 [K].
+                          [5.0]
+  --LBLRTM_TDIFF2       : Maximum layer temperature difference at ALTD2 [K].
+                          [8.0]
+  --LBLRTM_ALTD1        : Altitude of TDIFF1 [km]. [0.0]
+  --LBLRTM_ALTD2        : Altitude of TDIFF2 [km]. [0.0]
+  --LBLRTM_DELV         : Number of wavenumbers [cm-1] per major division. [1.0]
+  --EXPERT_MODE         : If set to true, will check if TAG[INIT_FIT_PARAMETERS]
+                          points to a fits file with a bintable of parameter
+                          values to use as initial values for the fitting
+                          process. [FALSE]
+  --CHIP_EXTENSIONS     : Flag that determines if image extensions are to be
+                          treated as independent
+                          science data to be fitted for independently or as
+                          CHIP specific subranges 
+                          of a single observation to be fitted for as a single
+                          combined spectrum.
+                          Value = TRUE implies to treat as CHIPS to be
+                          combined. Value = FALSE implies
+                          to treat as independent. [FALSE]. [FALSE]
+
+  Note that it is also possible to create a configuration file containing
+  these options, along with suitable default values. Please refer to the
+  details provided by the 'esorex --help' command.
+
+AUTHOR
+  Jose A. Escartin
+
+BUGS
+  Please report any problems with this recipe to https://support.eso.org/
+
+RELEASE
+  molecfit_model -- version 4.4.4
+
+LICENSE
+  This file is part of the Molecfit Pipeline
+  Copyright (C) 2019 European Southern Observatory
+  
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+  
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, 
+  MA  02111-1307  USA

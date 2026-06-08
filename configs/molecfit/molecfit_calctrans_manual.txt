@@ -1,0 +1,187 @@
+
+     ***** ESO Recipe Execution Tool, version 3.13.10  *****
+
+
+NAME
+  molecfit_calctrans -- Read the results from molecfit_model and computes the
+                        telluric correction for a scientific input data.
+
+SYNOPSIS
+  esorex [esorex-options] molecfit_calctrans [molecfit_calctrans-options] sof
+
+DESCRIPTION
+  This recipe applies the results from molecfit_model and runs calctrans (lblrtm/convolution)
+     to calculate the telluric correction for scientific input data. If no kernel library is provided, molecfit_calctrans uses the kernel information provided in 
+     the BEST_FIT_PARAMETERS.fits table (boxfwhm, gaussfwhm, lorentzfwhm) together with the 
+     HIERARCH ESO keywords: DRS MOLECFIT PARAM KERNMODE, DRS MOLECFIT PARAM KERNFAC, and DRS MOLECFIT PARAM VARKERN.
+  
+  The input scientific input data can have category: 
+    - BINTABLE  - Table  (single or multi-extension, optionally with some NULL extensions)
+    - IMAGE(1D) - Vector (single or multi-extension, optionally with some NULL extensions)
+    - IMAGE(2D) - Image  (single or multi-extension, optionally with some NULL extensions)
+  It is not mandatory that all the extensions contain data.
+  Molecfit will be run  on all the extensions that contain data.
+  The recipe also accepts as input a kernel library.
+  
+  Input files:
+    - Mandatory,  the input SCIENCE_CALCTRANS/SCIENCE data (Only one).
+    - Mandatory,  the fit MODEL_MOLECULES              (Same output of molecfit_model).
+    - Optionally, the user kernel library.
+    - If the user kernel library is used, the parameter CALCTRANS_MAPPING_KERNEL or MAPPING_KERNEL is a list of the extensions to map from the kernel library file CALCTRANS_KERNEL_LIBRARY or KERNEL_LIBRARY to the extensions of the SCIENCE_CALCTRANS or SCIENCE input file.
+    - Mandatory,  ATM_PARAMETERS                       (Same output of molecfit_model).
+    - Mandatory,  BEST_FIT_PARAMETERS                  (Same output of molecfit_model).
+    - Mandatory,  MAPPING_ATMOSPHERIC                  (List of the extensions to map from the associated file ATM_PARAMETERS to the extensions of the SCIENCE_CALCTRANS or SCIENCE input file).
+    - Mandatory,  MAPPING_CONVOLVE                     (List of the extensions to map from the associated file LBLRTM_RESULTS to the extensions of the TELLURIC_CORR output).
+  
+  DO: Category                                 Required   Explanation
+  -------------                                --------   -----------
+    SCIENCE_CALCTRANS or SCIENCE                 Y        The input spectrum        (Multi-extension FITS           format).
+    MODEL_MOLECULES                              Y        The molecules table       (         3-cols FITS BINTABLE  format).
+    CALCTRANS_KERNEL_LIBRARY or KERNEL_LIBRARY   N        The kernel library        (Multi-extension FITS IMAGE(2D) format).
+    CALCTRANS_MAPPING_KERNEL or MAPPING_KERNEL   N        Kernel mapping table      (         1-col  FITS BINTABLE  format) or the recipe parameter --CALCTRANS_MAPPING_KERNEL.
+    ATM_PARAMETERS                               Y        Atmospheric  parameters   (Multi-extension FITS BINTABLE  format).
+    BEST_FIT_PARAMETERS                          Y        Best fitting parameters   (Multi-extension FITS BINTABLE  format).
+    MAPPING_ATMOSPHERIC                          N        Atmospheric mapping table (         1-col  FITS BINTABLE  format) or the recipe parameter --MAPPING_ATMOSPHERIC.
+    MAPPING_CONVOLVE                             N        Convolution mapping table (         1-col  FITS BINTABLE  format) or the recipe parameter --MAPPING_CONVOLVE.
+  
+  Notes:
+    - CALCTRANS_MAPPING_KERNEL  BINTABLE column  [KERNEL_LIBRARY_EXT]
+    - MAPPING_ATMOSPHERIC       BINTABLE column  [ATM_PARAMETERS_EXT]
+    - MAPPING_CONVOLVE          BINTABLE column  [LBLRTM_RESULTS_EXT]
+  
+  
+  Output files:
+  
+  DO: Category                      Explanation
+  -------------                     -----------
+    CALCTRANS_CHIPS_COMBINED        Input file chips combined in molecfit format (FITS BINTABLE format).
+    LBLRTM_RESULTS                  For every input spectrum in the MAPPING_ATMOSPHERIC extension a new extension is generated (Multi-extension FITS BINTABLE format).
+    TELLURIC_DATA                   An intermediate data product BINTABLE that contains the input spectrum (lambda and flux columns), the telluric correction model (mlambda and mtrans columns) and the corrected input spectrum (lambda and cflux columns).
+    TELLURIC_CORR                   Telluric correction (transmission spectrum of the atmosphere) that needs to be applied (Multi-extension FITS IMAGE(1D) format).
+    CALCTRANS_KERNEL_LIBRARY        The kernel library specifies optional line spread functions that must be convolved with the atmospheric model.
+  
+  ----------------------------------------------------------------------------
+  The best fitting parameters as provided by the molecfit_model are used by molecfit_calctrans to generate a high-spectral resolution telluric transmission spectrum.
+  Molecfit_calctrans takes into account the difference between the observed airmasses of the input data provided to molecfit_model and molecfit_calctrans.
+  This spectrum is then convolved with either the kernel(s) with the best fitting parameters determined by molecfit_model or with the kernel library (if provided)
+  to match the spectral resolution of the scientific spectrum.
+  
+  
+
+OPTIONS
+  The following options are provided by this recipe.
+
+  --USE_ONLY_INPUT_PRIMARY_DATA  : Value=TRUE implies that only the fits primary
+                                   contains the input science flux data.
+                                   Value=FALSE implies that the fits extensions
+                                   also contains input science flux data.
+                                   [FALSE]
+  --USE_DATA_EXTENSION_AS_DFLUX  : Only valid if
+                                   USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                   extension index that contains the
+                                   errors of the science flux data (DFLUX). A
+                                   value of 0 implies that there is no DFLUX.
+                                   [0]
+  --USE_DATA_EXTENSION_AS_MASK  : Only valid if
+                                  USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                  extension index that contains the
+                                  mask associated with the science flux data. A
+                                  value of 0 implies that there is no mask
+                                  data. [0]
+  --USE_INPUT_KERNEL    : If TRUE, use the kernel library if it is provided.
+                          [TRUE]
+  --CALCTRANS_MAPPING_KERNEL  : Mapping 'SCIENCE' - 'CALCTRANS_KERNEL_LIBRARY'
+                                [string with ext_number comma separated (int)]
+                                :
+                                If set to NULL, check if the
+                                TAG[CALCTRANS_MAPPING_KERNEL] FITS BINTABLE
+                                values is provided.
+                                The FITS BINTABLE have to one column
+                                [KERNEL_LIBRARY_EXT]. [NULL]
+  --MAPPING_ATMOSPHERIC : Mapping 'SCIENCE' - 'ATM_PARAMETERS' input [string
+                          with ext_number comma separated (int)] :
+                          If set to NULL, check if the TAG[MAPPING_ATMOSPHERIC]
+                          FITS BINTABLE value is provided.
+                          The FITS BINTABLE have to one column
+                          [ATM_PARAMETERS_EXT]. [NULL]
+  --MAPPING_CONVOLVE    : Mapping 'LBLRTM_RESULTS' - 'TELLURIC_CORR' output
+                          [string with ext_number comma separated (int)] :
+                          If set to NULL, check if the TAG[MAPPING_CONVOLVE]
+                          FITS BINTABLE value is provided.
+                          The FITS BINTABLE have to one column
+                          [LBLRTM_RESULTS_EXT]. [NULL]
+  --CHIP_EXTENSIONS     : Flag that determines if image extensions are to be
+                          treated as independent
+                          science data to be fitted for independently or as
+                          CHIP specific subranges 
+                          of a single observation to be fitted for as a single
+                          combined spectrum.
+                          Value = TRUE implies to treat as CHIPS to be
+                          combined. Value = FALSE implies
+                          to treat as independent. [FALSE]. [FALSE]
+  --SCALE_PWV           : Value read from science file to scale the precipitable
+                          water vapor (PWV) of the telluric spectra.
+                          If set to 'auto', the mean value of TEL AMBI IWV
+                          START/END is read from the header of the input
+                          science file.
+                          If set to a user-provided numerical value, use this
+                          as the scale factor.
+                          If set to a FITS header keyword, read in the scale
+                          factor from the header of the input science file
+                          using this keyword.
+                          If set to 'none', perform no scaling. [none]
+  --HDR_MJD             : FITS header keyword to read the Modified Julian Date
+                          at the START of the exposure from telluric and
+                          science header. The telluric header was copied to
+                          BEST_FIT_PARAMETERS by molecfit_model and read from
+                          there. [MJD-OBS]
+  --HDR_EXP             : FITS header keyword to read the exposure time from
+                          telluric and science header. The telluric header was
+                          copied to BEST_FIT_PARAMETERS by molecfit_model and
+                          read from there. [ESO OBS EXECTIME]
+  --HDR_AIR1            : FITS header keyword to read the airmass at the start
+                          of the exposure from the telluric and science header.
+                          The telluric header was copied to BEST_FIT_PARAMETERS
+                          by molecfit_model and read from there. [ESO TEL AIRM
+                          START]
+  --HDR_AIR2            : FITS header keyword to read the airmass at the end of
+                          the exposure from the telluric and science header.
+                          The telluric header was copied to BEST_FIT_PARAMETERS
+                          by molecfit_model and read from there. [ESO TEL AIRM
+                          END]
+  --SGWL                : Savitzky-Golay filter smoothing window length in
+                          pixels. [15]
+  --SGWL_ASMAX          : Treat the Savitzky-Golay filter smoothing window
+                          length as a maximum length. [FALSE]
+
+  Note that it is also possible to create a configuration file containing
+  these options, along with suitable default values. Please refer to the
+  details provided by the 'esorex --help' command.
+
+AUTHOR
+  Jose A. Escartin
+
+BUGS
+  Please report any problems with this recipe to https://support.eso.org/
+
+RELEASE
+  molecfit_calctrans -- version 4.4.4
+
+LICENSE
+  This file is part of the Molecfit Pipeline
+  Copyright (C) 2019 European Southern Observatory
+  
+  This program is free software; you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation; either version 2 of the License, or
+  (at your option) any later version.
+  
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+  
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, 
+  MA  02111-1307  USA

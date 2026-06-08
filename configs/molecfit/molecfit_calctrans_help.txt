@@ -1,0 +1,96 @@
+
+     ***** ESO Recipe Execution Tool, version 3.13.10  *****
+
+Recipe: molecfit_calctrans -- Read the results from molecfit_model and computes
+  the telluric correction for a scientific input data.
+
+Usage: esorex [esorex-options] molecfit_calctrans [molecfit_calctrans-options] sof
+
+Options:
+
+  --USE_ONLY_INPUT_PRIMARY_DATA  : Value=TRUE implies that only the fits primary
+                                   contains the input science flux data.
+                                   Value=FALSE implies that the fits extensions
+                                   also contains input science flux data.
+                                   [FALSE]
+  --USE_DATA_EXTENSION_AS_DFLUX  : Only valid if
+                                   USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                   extension index that contains the
+                                   errors of the science flux data (DFLUX). A
+                                   value of 0 implies that there is no DFLUX.
+                                   [0]
+  --USE_DATA_EXTENSION_AS_MASK  : Only valid if
+                                  USE_ONLY_INPUT_PRIMARY_DATA=TRUE. The fits
+                                  extension index that contains the
+                                  mask associated with the science flux data. A
+                                  value of 0 implies that there is no mask
+                                  data. [0]
+  --USE_INPUT_KERNEL    : If TRUE, use the kernel library if it is provided.
+                          [TRUE]
+  --CALCTRANS_MAPPING_KERNEL  : Mapping 'SCIENCE' - 'CALCTRANS_KERNEL_LIBRARY'
+                                [string with ext_number comma separated (int)]
+                                :
+                                If set to NULL, check if the
+                                TAG[CALCTRANS_MAPPING_KERNEL] FITS BINTABLE
+                                values is provided.
+                                The FITS BINTABLE have to one column
+                                [KERNEL_LIBRARY_EXT]. [NULL]
+  --MAPPING_ATMOSPHERIC : Mapping 'SCIENCE' - 'ATM_PARAMETERS' input [string
+                          with ext_number comma separated (int)] :
+                          If set to NULL, check if the TAG[MAPPING_ATMOSPHERIC]
+                          FITS BINTABLE value is provided.
+                          The FITS BINTABLE have to one column
+                          [ATM_PARAMETERS_EXT]. [NULL]
+  --MAPPING_CONVOLVE    : Mapping 'LBLRTM_RESULTS' - 'TELLURIC_CORR' output
+                          [string with ext_number comma separated (int)] :
+                          If set to NULL, check if the TAG[MAPPING_CONVOLVE]
+                          FITS BINTABLE value is provided.
+                          The FITS BINTABLE have to one column
+                          [LBLRTM_RESULTS_EXT]. [NULL]
+  --CHIP_EXTENSIONS     : Flag that determines if image extensions are to be
+                          treated as independent
+                          science data to be fitted for independently or as
+                          CHIP specific subranges 
+                          of a single observation to be fitted for as a single
+                          combined spectrum.
+                          Value = TRUE implies to treat as CHIPS to be
+                          combined. Value = FALSE implies
+                          to treat as independent. [FALSE]. [FALSE]
+  --SCALE_PWV           : Value read from science file to scale the precipitable
+                          water vapor (PWV) of the telluric spectra.
+                          If set to 'auto', the mean value of TEL AMBI IWV
+                          START/END is read from the header of the input
+                          science file.
+                          If set to a user-provided numerical value, use this
+                          as the scale factor.
+                          If set to a FITS header keyword, read in the scale
+                          factor from the header of the input science file
+                          using this keyword.
+                          If set to 'none', perform no scaling. [none]
+  --HDR_MJD             : FITS header keyword to read the Modified Julian Date
+                          at the START of the exposure from telluric and
+                          science header. The telluric header was copied to
+                          BEST_FIT_PARAMETERS by molecfit_model and read from
+                          there. [MJD-OBS]
+  --HDR_EXP             : FITS header keyword to read the exposure time from
+                          telluric and science header. The telluric header was
+                          copied to BEST_FIT_PARAMETERS by molecfit_model and
+                          read from there. [ESO OBS EXECTIME]
+  --HDR_AIR1            : FITS header keyword to read the airmass at the start
+                          of the exposure from the telluric and science header.
+                          The telluric header was copied to BEST_FIT_PARAMETERS
+                          by molecfit_model and read from there. [ESO TEL AIRM
+                          START]
+  --HDR_AIR2            : FITS header keyword to read the airmass at the end of
+                          the exposure from the telluric and science header.
+                          The telluric header was copied to BEST_FIT_PARAMETERS
+                          by molecfit_model and read from there. [ESO TEL AIRM
+                          END]
+  --SGWL                : Savitzky-Golay filter smoothing window length in
+                          pixels. [15]
+  --SGWL_ASMAX          : Treat the Savitzky-Golay filter smoothing window
+                          length as a maximum length. [FALSE]
+
+For help on the options of esorex itself, please use the command 'esorex --help'
+(that is, without specifying any recipe name). For more information about the
+recipe, one can also use the command 'esorex --man-page molecfit_calctrans'.
