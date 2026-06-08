@@ -233,6 +233,7 @@ def main():
     ax.set_xlabel("Wavelength [micron]")
     ax.set_ylabel("Flux")
     ax.set_title(f"Telluric injection preview - {RUN_ID}")
+    ax.legend()
     add_metadata_box(ax, metadata_text)
     fig.tight_layout()
     out = OUTPUT_DIR / f"{RUN_ID}_phoenix_vs_telluric.png"
@@ -250,6 +251,7 @@ def main():
     ax.set_xlabel("Wavelength [micron]")
     ax.set_ylabel("Flux")
     ax.set_title(f"Telluric injection zoom {zoom_min}-{zoom_max} micron - {RUN_ID}")
+    ax.legend()
     add_metadata_box(ax, metadata_text)
     fig.tight_layout()
     out = OUTPUT_DIR / f"{RUN_ID}_phoenix_vs_telluric_zoom.png"
