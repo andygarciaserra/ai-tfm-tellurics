@@ -52,46 +52,61 @@ The final goal is to use these datasets to train machine learning models for tel
 ## Repository structure
 
 ```text
+## Repository structure
+
+```text
 ai-tfm-tellurics/
-  README.md
-  requirements.txt
-  setup.sh
-  .gitignore
-
-  scripts/
-    01_download_prepare_phoenix.py
-    02_generate_phoenix_pool.sh
-    03_validate_phoenix_pool.py
-    04_generate_mtrans_single.sh
-    05_generate_mtrans_grid.sh *
-    06_validate_mtrans_grid.py *
-    07_build_synthetic_dataset.py *
-
-    utils/
-      inspect_fits.py
-      create_flat_spectrum.py
-
-    examples/
-      demo_blackbody_tellurics.py
-
-    _archive_initial/
-      (old exploratory scripts)
-
-  configs/
-    phoenix_initial_pool.csv
-
-
-* To be done
+├── README.md
+├── requirements.txt
+├── configs/
+│   ├── phoenix_initial_pool.csv
+│   └── molecfit/
+│       ├── molecfit_model.rc
+│       ├── molecfit_calctrans.rc
+│       ├── mtrans_single_config.csv
+│       ├── mtrans_grid.csv
+│       ├── mtrans_config_test.csv
+│       ├── molecfit_model_manual.txt
+│       └── molecfit_calctrans_manual.txt
+├── docs/
+│   └── postit.md
+└── scripts/
+    ├── 01_download_prepare_phoenix.py
+    ├── 02_generate_phoenix_pool.sh
+    ├── 03_validate_phoenix_pool.py
+    ├── 04_generate_mtrans_single.sh
+    ├── 05_preview_telluric_injection.py
+    ├── utils/
+    │   ├── inspect_fits.py
+    │   ├── debug_fits_structure.py
+    │   ├── create_flat_spectrum.py
+    │   └── create_molecfit_mappings.py
+    ├── examples/
+    │   └── demo_blackbody_tellurics.py
+    └── _archive_initial/
+        └── old exploratory scripts
 ```
 
-Large generated files should be stored outside the repository, for example:
+
+Large generated files are stored outside the repository, following this structure:
 
 ```text
 TFM_DATA/
-  phoenix/
-  molecfit/
-  synthetic/
-  plots/
+├── phoenix/
+│   ├── downloads/
+│   ├── raw/
+│   ├── resampled/
+│   └── metadata/
+├── molecfit/
+│   └── runs/
+│       └── <run_id>/
+│           ├── molecfit_model/
+│           ├── molecfit_calctrans/
+│           ├── logs/
+│           ├── metadata/
+│           └── preview/
+├── synthetic/
+└── plots/
 ```
 
 ---
@@ -282,24 +297,186 @@ python scripts/03_validate_phoenix_pool.py configs/phoenix_initial_pool.csv
 
 ---
 
+````markdown
 ### `scripts/04_generate_mtrans_single.sh`
 
-Initial script for generating one Molecfit/mtrans atmospheric transmission model.
+Generates one Molecfit/calctrans atmospheric transmission run from a CSV configuration file.
 
-This script is the starting point for the atmospheric part of the pipeline. The goal is to first generate one local `mtrans` product in a controlled and reproducible way before scaling to a grid of atmospheric models.
+This script is the basic unit of the atmospheric part of the pipeline. It uses a PHOENIX spectrum as the wavelength/template input and generates the corresponding Molecfit products and telluric transmission files.
 
-**Planned role:**
+The script reads one row from a Molecfit configuration CSV, selected by `run_id`.
 
-* generate one atmospheric transmission model,
-* store the output in `TFM_DATA/molecfit/`,
-* keep logs and metadata for the run,
-* serve as the basic unit for future grid generation and parallelization.
+**Main inputs:**
+
+```text
+configs/molecfit/mtrans_single_config.csv
+configs/molecfit/mtrans_grid.csv
+configs/molecfit/mtrans_config_test.csv
+````
+
+Each row contains the atmospheric and observational parameters used for a run, for example:
+
+```text
+run_id
+template_spectrum
+pwv
+telalt
+rhum
+pres
+temp
+molecules
+fit_molec
+rel_col
+wave_include
+wavelength_frame
+latitude
+longitude
+geoelev
+slit_width
+pix_scale
+```
+
+**Main tasks:**
+
+* read atmospheric parameters from a CSV configuration file,
+* create the `molecfit_model.sof` file for the selected run,
+* run `esorex molecfit_model`,
+* locate the required Molecfit products:
+
+  * `MODEL_MOLECULES.fits`,
+  * `ATM_PARAMETERS.fits`,
+  * `BEST_FIT_PARAMETERS.fits`,
+* create explicit Molecfit mapping FITS files,
+* create the `molecfit_calctrans.sof` file,
+* run `esorex molecfit_calctrans`,
+* store all outputs in a run-specific folder.
 
 **Example:**
 
 ```bash
-bash scripts/04_generate_mtrans_single.sh
+bash scripts/04_generate_mtrans_single.sh atm_test002 configs/molecfit/mtrans_config_test.csv
 ```
+
+**Run output structure:**
+
+```text
+TFM_DATA/molecfit/runs/<run_id>/
+  molecfit_model.sof
+  molecfit_calctrans.sof
+  MAPPING_ATMOSPHERIC.fits
+  MAPPING_CONVOLVE.fits
+
+  molecfit_model/
+    MODEL_MOLECULES.fits
+    ATM_PARAMETERS.fits
+    BEST_FIT_PARAMETERS.fits
+    BEST_FIT_MODEL.fits
+    MOLECFIT_DATA.fits
+    ...
+
+  molecfit_calctrans/
+    TELLURIC_DATA.fits
+    TELLURIC_CORR.fits
+    LBLRTM_RESULTS.fits
+
+  logs/
+    molecfit_model.log
+    molecfit_calctrans.log
+    timing.log
+```
+
+The most relevant product for the synthetic dataset is:
+
+```text
+TELLURIC_DATA.fits
+```
+
+It contains the original input spectrum and the telluric model columns, including:
+
+```text
+lambda
+flux
+mlambda
+mtrans
+cflux
+qual
+```
+
+---
+
+````markdown
+### `scripts/05_preview_telluric_injection.py`
+
+Creates diagnostic plots for one Molecfit/calctrans run.
+
+This script is used to visually validate that a generated atmospheric transmission can be applied to a PHOENIX spectrum to create a telluric-contaminated synthetic spectrum.
+
+**Main tasks:**
+
+* read `TELLURIC_DATA.fits` from a selected `run_id`,
+* extract:
+  * `lambda`,
+  * `flux`,
+  * `mlambda`,
+  * `mtrans`,
+  * `qual`,
+* interpolate the telluric transmission from the Molecfit model wavelength grid to the PHOENIX wavelength grid,
+* compute:
+
+```text
+synthetic_flux(lambda) = flux(lambda) × mtrans_interpolated(lambda)
+````
+
+* generate diagnostic plots:
+
+  * atmospheric transmission,
+  * PHOENIX clean spectrum vs PHOENIX × mtrans,
+  * zoomed view of the telluric absorption region,
+* print interpolation diagnostics:
+
+  * input wavelength ranges,
+  * overlap between `lambda` and `mlambda`,
+  * NaNs after interpolation,
+  * valid/rejected points,
+  * final wavelength range,
+  * final transmission range.
+
+**Important note about wavelength grids:**
+
+`TELLURIC_DATA.fits` contains both:
+
+```text
+lambda   = wavelength grid of the input PHOENIX spectrum
+mlambda  = wavelength grid of the Molecfit telluric model
+mtrans   = telluric transmission defined on mlambda
+```
+
+Therefore, the transmission should not be applied by array index. It must first be interpolated:
+
+```text
+mtrans(mlambda) → mtrans(lambda)
+```
+
+and only then multiplied by the PHOENIX flux.
+
+**Example:**
+
+```bash
+python scripts/05_preview_telluric_injection.py
+```
+
+**Preview outputs:**
+
+```text
+TFM_DATA/molecfit/runs/<run_id>/preview/
+  <run_id>_mtrans.png
+  <run_id>_phoenix_vs_telluric.png
+  <run_id>_phoenix_vs_telluric_zoom.png
+```
+
+```
+```
+
 
 ---
 
@@ -366,25 +543,39 @@ which esorex
 
 ## Current status
 
-* [x] Molecfit installed and running.
-* [x] PHOENIX download tested.
-* [x] First PHOENIX spectrum downloaded and resampled.
-* [x] Initial PHOENIX stellar pool generated and validated.
-* [x] PHOENIX pool configuration file added.
+
+* [x] Molecfit installed through ESO pipelines / EsoRex.
+* [x] PHOENIX download and preparation tested.
+* [x] Initial PHOENIX stellar pool generated.
 * [x] PHOENIX pool validation script added.
-* [ ] Molecfit/mtrans atmospheric grid automated.
+* [x] First Molecfit/calctrans run completed from PHOENIX input.
+* [x] Explicit Molecfit mapping FITS files implemented.
+* [x] Atmospheric parameters moved to CSV configuration.
+* [x] `TELLURIC_DATA.fits` generated and inspected.
+* [x] Telluric injection preview implemented.
+* [x] `mtrans(mlambda)` interpolation to the PHOENIX `lambda` grid implemented.
+* [ ] Automated mtrans grid generation.
+* [ ] Synthetic dataset FITS builder.
+* [ ] Execution and timing comparison on Dicha/IAC.
+
 
 ---
 
 ## Roadmap
 
-1. Automate Molecfit/mtrans single-run generation.
-2. Generate a small local mtrans test grid.
-3. Test the same workflow on Dicha/IAC.
-4. Add parallel mtrans generation.
-5. Build the first synthetic dataset.
-6. Add instrumental resolution and noise.
-
+1. Clean and consolidate the Molecfit configuration files.
+2. Generate a small atmospheric mtrans grid from CSV.
+3. Validate changes in `mtrans` with PWV, telescope altitude and molecule columns.
+4. Apply each generated mtrans to the PHOENIX stellar pool.
+5. Build self-contained synthetic FITS files containing:
+   * clean stellar flux,
+   * interpolated mtrans,
+   * telluric-contaminated flux,
+   * atmospheric parameters,
+   * stellar parameters.
+6. Add noise and instrumental effects.
+7. Test the pipeline on Dicha/IAC.
+8. Parallelize mtrans generation.
 
 ## Notes
 

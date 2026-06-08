@@ -2,15 +2,11 @@
 set -euo pipefail
 
 # ------------------------------------------------------------
-# Generate one Molecfit/calctrans mtrans run from a CSV config.
-#
-# Usage:
-#   ./scripts/04_generate_mtrans_single.sh atm001 configs/molecfit/mtrans_config.csv
+# Generate one Molecfit/calctrans run.
 #
 # Pipeline:
-#   template PHOENIX FITS
+#   PHOENIX FITS
 #     -> molecfit_model
-#     -> mapping FITS files
 #     -> molecfit_calctrans
 #     -> TELLURIC_DATA / TELLURIC_CORR
 # ------------------------------------------------------------
@@ -21,94 +17,17 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DATA_ROOT="${TFM_DATA_ROOT:-$HOME/TFM_DATA}"
 
 RUN_ID="${1:-atm001}"
-CONFIG_CSV_ARG="${2:-configs/molecfit/mtrans_config.csv}"
-
-if [[ "$CONFIG_CSV_ARG" = /* ]]; then
-  CONFIG_CSV="$CONFIG_CSV_ARG"
-else
-  CONFIG_CSV="$REPO_ROOT/$CONFIG_CSV_ARG"
-fi
-
-if [[ ! -f "$CONFIG_CSV" ]]; then
-  echo "ERROR: Missing config CSV:"
-  echo "  $CONFIG_CSV"
-  exit 1
-fi
-
-# ------------------------------------------------------------
-# Read selected row from CSV using Python csv module.
-# This supports quoted comma-separated fields like:
-#   "H2O,O2,O3,CO2"
-# ------------------------------------------------------------
-
-eval "$(
-python - "$CONFIG_CSV" "$RUN_ID" <<'PY'
-import csv
-import shlex
-import sys
-from pathlib import Path
-
-config_path = Path(sys.argv[1])
-run_id = sys.argv[2]
-
-with config_path.open(newline="") as f:
-    reader = csv.DictReader(f)
-    rows = [row for row in reader if row.get("run_id") == run_id]
-
-if not rows:
-    raise SystemExit(f"ERROR: run_id '{run_id}' not found in {config_path}")
-
-row = rows[0]
-
-required = [
-    "template_spectrum",
-    "pwv",
-    "telalt",
-    "rhum",
-    "pres",
-    "temp",
-    "molecules",
-    "fit_molec",
-    "rel_col",
-    "wave_include",
-    "wavelength_frame",
-    "latitude",
-    "longitude",
-    "geoelev",
-    "slit_width",
-    "pix_scale",
-]
-
-missing = [key for key in required if key not in row or row[key] == ""]
-if missing:
-    raise SystemExit(f"ERROR: missing required columns/values: {missing}")
-
-mapping = {
-    "TEMPLATE_SPECTRUM": row["template_spectrum"],
-    "PWV": row["pwv"],
-    "TELALT": row["telalt"],
-    "RHUM": row["rhum"],
-    "PRES": row["pres"],
-    "TEMP": row["temp"],
-    "MOLECULES": row["molecules"],
-    "FIT_MOLEC": row["fit_molec"],
-    "REL_COL": row["rel_col"],
-    "WAVE_INCLUDE": row["wave_include"],
-    "WAVELENGTH_FRAME": row["wavelength_frame"],
-    "LATITUDE": row["latitude"],
-    "LONGITUDE": row["longitude"],
-    "GEOELEV": row["geoelev"],
-    "SLIT_WIDTH": row["slit_width"],
-    "PIX_SCALE": row["pix_scale"],
-}
-
-for key, value in mapping.items():
-    print(f"{key}={shlex.quote(str(value))}")
-PY
-)"
+MODEL_SOF_ARG="${2:-configs/molecfit/molecfit_model.sof}"
 
 MODEL_RC="$REPO_ROOT/configs/molecfit/molecfit_model.rc"
 CALCTRANS_RC="$REPO_ROOT/configs/molecfit/molecfit_calctrans.rc"
+
+# Interpret relative SOF paths from the repository root.
+if [[ "$MODEL_SOF_ARG" = /* ]]; then
+  MODEL_SOF="$MODEL_SOF_ARG"
+else
+  MODEL_SOF="$REPO_ROOT/$MODEL_SOF_ARG"
+fi
 
 RUN_ROOT="$DATA_ROOT/molecfit/runs/$RUN_ID"
 MODEL_OUT="$RUN_ROOT/molecfit_model"
@@ -119,8 +38,6 @@ METADATA_DIR="$RUN_ROOT/metadata"
 MODEL_LOG="$LOG_DIR/molecfit_model.log"
 CALCTRANS_LOG="$LOG_DIR/molecfit_calctrans.log"
 TIME_LOG="$LOG_DIR/timing.log"
-
-MODEL_SOF="$RUN_ROOT/molecfit_model.sof"
 CALCTRANS_SOF="$RUN_ROOT/molecfit_calctrans.sof"
 
 MAPPING_ATM="$RUN_ROOT/MAPPING_ATMOSPHERIC.fits"
@@ -129,19 +46,14 @@ MAPPING_CONV="$RUN_ROOT/MAPPING_CONVOLVE.fits"
 mkdir -p "$MODEL_OUT" "$CALCTRANS_OUT" "$LOG_DIR" "$METADATA_DIR"
 
 echo "========================================"
-echo "Generating Molecfit/calctrans mtrans run"
-echo "Run ID:             $RUN_ID"
-echo "Config CSV:         $CONFIG_CSV"
-echo "Repo root:          $REPO_ROOT"
-echo "Data root:          $DATA_ROOT"
-echo "Template spectrum:  $TEMPLATE_SPECTRUM"
-echo "PWV:                $PWV"
-echo "TELALT:             $TELALT"
-echo "Molecules:          $MOLECULES"
-echo "Fit molecules:      $FIT_MOLEC"
-echo "Relative columns:   $REL_COL"
-echo "Wave include:       $WAVE_INCLUDE"
-echo "Run folder:         $RUN_ROOT"
+echo "Generating Molecfit/calctrans single run"
+echo "Run ID:        $RUN_ID"
+echo "Repo root:     $REPO_ROOT"
+echo "Data root:     $DATA_ROOT"
+echo "Model RC:      $MODEL_RC"
+echo "Calctrans RC:  $CALCTRANS_RC"
+echo "Model SOF:     $MODEL_SOF"
+echo "Run folder:    $RUN_ROOT"
 echo "========================================"
 echo
 
@@ -157,9 +69,9 @@ if [[ ! -f "$CALCTRANS_RC" ]]; then
   exit 1
 fi
 
-if [[ ! -f "$TEMPLATE_SPECTRUM" ]]; then
-  echo "ERROR: Template spectrum does not exist:"
-  echo "  $TEMPLATE_SPECTRUM"
+if [[ ! -f "$MODEL_SOF" ]]; then
+  echo "ERROR: Missing model SOF file:"
+  echo "  $MODEL_SOF"
   exit 1
 fi
 
@@ -168,33 +80,19 @@ if ! command -v esorex >/dev/null 2>&1; then
   exit 1
 fi
 
-cat > "$MODEL_SOF" <<EOF
-$TEMPLATE_SPECTRUM SCIENCE
-EOF
+SCIENCE_FILE="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' "$MODEL_SOF")"
+
+if [[ ! -f "$SCIENCE_FILE" ]]; then
+  echo "ERROR: Science file listed in SOF does not exist:"
+  echo "  $SCIENCE_FILE"
+  exit 1
+fi
 
 {
   echo "Run ID: $RUN_ID"
   echo "Date:   $(date -Iseconds)"
   echo "Host:   $(hostname)"
-  echo "Config CSV: $CONFIG_CSV"
-  echo "Template spectrum: $TEMPLATE_SPECTRUM"
-  echo
-  echo "Atmospheric/config parameters:"
-  echo "PWV=$PWV"
-  echo "TELALT=$TELALT"
-  echo "RHUM=$RHUM"
-  echo "PRES=$PRES"
-  echo "TEMP=$TEMP"
-  echo "MOLECULES=$MOLECULES"
-  echo "FIT_MOLEC=$FIT_MOLEC"
-  echo "REL_COL=$REL_COL"
-  echo "WAVE_INCLUDE=$WAVE_INCLUDE"
-  echo "WAVELENGTH_FRAME=$WAVELENGTH_FRAME"
-  echo "LATITUDE=$LATITUDE"
-  echo "LONGITUDE=$LONGITUDE"
-  echo "GEOELEV=$GEOELEV"
-  echo "SLIT_WIDTH=$SLIT_WIDTH"
-  echo "PIX_SCALE=$PIX_SCALE"
+  echo "Science file: $SCIENCE_FILE"
   echo
 } > "$TIME_LOG"
 
@@ -202,46 +100,52 @@ echo "Running molecfit_model..."
 echo "Log: $MODEL_LOG"
 echo
 
+{
+  echo "Command:"
+  echo "esorex --recipe-config=$MODEL_RC --output-dir=$MODEL_OUT molecfit_model ..."
+  echo
+} >> "$TIME_LOG"
+
 /usr/bin/time -p \
   esorex \
     --recipe-config="$MODEL_RC" \
     --output-dir="$MODEL_OUT" \
     molecfit_model \
-    --LIST_MOLEC="$MOLECULES" \
-    --FIT_MOLEC="$FIT_MOLEC" \
-    --REL_COL="$REL_COL" \
-    --WAVE_INCLUDE="$WAVE_INCLUDE" \
+    --LIST_MOLEC="H2O,O2,O3,CO2" \
+    --FIT_MOLEC="1,1,0,0" \
+    --REL_COL="1.0,1.0,1.0,1.0" \
+    --WAVE_INCLUDE="0.68,0.72,0.75,0.79" \
     --COLUMN_LAMBDA="WAVE_MICRON" \
     --COLUMN_FLUX="FLUX" \
     --COLUMN_DFLUX="NULL" \
     --COLUMN_MASK="NULL" \
     --WLG_TO_MICRON="1.0" \
-    --WAVELENGTH_FRAME="$WAVELENGTH_FRAME" \
-    --PWV="$PWV" \
+    --WAVELENGTH_FRAME="VAC" \
+    --PWV="3.0" \
     --OBSERVING_DATE_KEYWORD="NONE" \
     --OBSERVING_DATE_VALUE="60100.0" \
     --UTC_KEYWORD="NONE" \
     --UTC_VALUE="36000.0" \
     --TELESCOPE_ANGLE_KEYWORD="NONE" \
-    --TELESCOPE_ANGLE_VALUE="$TELALT" \
+    --TELESCOPE_ANGLE_VALUE="60.0" \
     --RELATIVE_HUMIDITY_KEYWORD="NONE" \
-    --RELATIVE_HUMIDITY_VALUE="$RHUM" \
+    --RELATIVE_HUMIDITY_VALUE="15.0" \
     --PRESSURE_KEYWORD="NONE" \
-    --PRESSURE_VALUE="$PRES" \
+    --PRESSURE_VALUE="750.0" \
     --TEMPERATURE_KEYWORD="NONE" \
-    --TEMPERATURE_VALUE="$TEMP" \
+    --TEMPERATURE_VALUE="15.0" \
     --MIRROR_TEMPERATURE_KEYWORD="NONE" \
-    --MIRROR_TEMPERATURE_VALUE="$TEMP" \
+    --MIRROR_TEMPERATURE_VALUE="15.0" \
     --ELEVATION_KEYWORD="NONE" \
-    --ELEVATION_VALUE="$GEOELEV" \
+    --ELEVATION_VALUE="2635.0" \
     --LONGITUDE_KEYWORD="NONE" \
-    --LONGITUDE_VALUE="$LONGITUDE" \
+    --LONGITUDE_VALUE="-70.4051" \
     --LATITUDE_KEYWORD="NONE" \
-    --LATITUDE_VALUE="$LATITUDE" \
+    --LATITUDE_VALUE="-24.6276" \
     --SLIT_WIDTH_KEYWORD="NONE" \
-    --SLIT_WIDTH_VALUE="$SLIT_WIDTH" \
+    --SLIT_WIDTH_VALUE="0.4" \
     --PIX_SCALE_KEYWORD="NONE" \
-    --PIX_SCALE_VALUE="$PIX_SCALE" \
+    --PIX_SCALE_VALUE="0.086" \
     "$MODEL_SOF" \
   > "$MODEL_LOG" 2>&1
 
@@ -278,7 +182,7 @@ echo "Creating calctrans SOF:"
 echo "  $CALCTRANS_SOF"
 
 cat > "$CALCTRANS_SOF" <<EOF
-$TEMPLATE_SPECTRUM SCIENCE
+$SCIENCE_FILE SCIENCE
 $MODEL_MOLECULES MODEL_MOLECULES
 $ATM_PARAMETERS ATM_PARAMETERS
 $BEST_FIT_PARAMETERS BEST_FIT_PARAMETERS
@@ -292,6 +196,13 @@ echo
 echo "Running molecfit_calctrans..."
 echo "Log: $CALCTRANS_LOG"
 echo
+
+{
+  echo
+  echo "Command:"
+  echo "esorex --recipe-config=$CALCTRANS_RC --output-dir=$CALCTRANS_OUT molecfit_calctrans $CALCTRANS_SOF"
+  echo
+} >> "$TIME_LOG"
 
 /usr/bin/time -p \
   esorex \
