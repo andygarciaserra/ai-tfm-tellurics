@@ -54,7 +54,6 @@ The final goal is to use these datasets to train machine learning models for tel
 ```text
 ## Repository structure
 
-```text
 ai-tfm-tellurics/
 ├── README.md
 ├── requirements.txt
